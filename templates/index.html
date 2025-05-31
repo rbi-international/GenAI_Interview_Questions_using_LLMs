@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Document title for the browser tab -->
+    <title>Interview Question Creator</title>
+    <!-- Bootstrap CSS for responsive design and styling -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9" crossorigin="anonymous">
+    
+    <style>
+        /* Hide result and download sections initially */
+        #result, #download {
+            display: none;
+        }
+
+        /* Large font size for icons */
+        .font-large {
+            font-size: 150px;
+        }
+
+        /* Additional styling for better user experience */
+        .card {
+            border-radius: 10px;
+        }
+        
+        .btn-success {
+            transition: all 0.3s ease;
+        }
+        
+        .btn-success:hover {
+            transform: scale(1.05);
+        }
+        
+        #download-btn {
+            padding: 15px 25px;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+        }
+        
+        #download-btn:hover {
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body class="bg-dark">
+    <!-- Header section with title -->
+    <section>
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-sm-12 text-center p-5 text-white">
+                    <h3>Interview Question Creator</h3>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- File upload section -->
+    <section class="mb-4">
+        <div class="container">
+            <div class="row">
+                <div class="col-sm-12">
+                    <div class="card p-5 shadow border-0 m-3">
+                        <div class="mb-3">
+                            <label for="pdf-file" class="form-label">Upload your PDF file here</label>
+                            <div class="input-group mb-3">
+                                <input type="file" class="form-control" id="pdf-file" accept=".pdf">
+                                <label class="input-group-text" for="pdf-file">Max No. of Pages is 5</label>
+                            </div>
+                        </div>
+                        <div class="mb-3 text-end">
+                            <button type="button" id="upload-btn" class="btn btn-md btn-success">Generate Q&A</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Results section (hidden initially) -->
+    <section id="result">
+        <div class="container">
+            <div class="row">
+                <!-- PDF viewer panel -->
+                <div class="col-sm-6">
+                    <div class="card shadow border-0 p-3 ms-3">
+                        <embed id="view-pdf" src="" width="100%" height="600px" />
+                    </div>
+                </div>
+                <!-- Processing and download panel -->
+                <div class="col-sm-6">
+                    <div class="card shadow border-0 p-5 me-3">
+                        <!-- Loading spinner (shown during processing) -->
+                        <div id="loader" class="text-center">
+                            <i class="fa-solid fa-spinner fa-spin-pulse font-large"></i>
+                        </div>
+                        <!-- Download button (shown after processing) -->
+                        <div id="download" class="text-center">
+                            <a href="" id="download-btn" class="btn btn-md btn-warning" download>
+                                <i class="fas fa-download"></i> Download Q&A
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- JavaScript libraries -->
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm" crossorigin="anonymous"></script>
+    <!-- Font Awesome for icons -->
+    <script src="https://kit.fontawesome.com/1da99de032.js" crossorigin="anonymous"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+    <!-- SweetAlert2 for pretty alerts -->
+    <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- PDF.js for PDF handling -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+
+    <script>
+        // DOM elements
+        let result = document.getElementById('result');
+        let loader = document.getElementById('loader');
+        let download = document.getElementById('download');
+        let viewPdf = document.getElementById('view-pdf');
+        let downloadBtn = document.getElementById('download-btn');
+
+        // Event handler for upload button
+        $(document).ready(function () {
+            $("#upload-btn").click(async function (event) {
+                event.preventDefault();
+                
+                // Validate file input
+                const fileInput = document.getElementById('pdf-file');
+                if (!fileInput.files.length) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'No File Selected',
+                        text: 'Please select a PDF file to upload.',
+                        confirmButtonColor: "#545454"
+                    });
+                    return;
+                }
+                
+                var file = fileInput.files[0];
+                
+                // Validate file type
+                if (file.type !== 'application/pdf') {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Invalid File Type',
+                        text: 'Please upload a PDF file.',
+                        confirmButtonColor: "#545454"
+                    });
+                    return;
+                }
+                
+                // Prepare form data for upload
+                const formData = new FormData();
+                formData.append('pdf_file', file);
+                formData.append('filename', file.name);
+                
+                // Show loading state
+                $("#upload-btn").prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...');
+                
+                // Upload the file
+                try {
+                    let response = await fetch('/upload', {
+                        method: "POST",
+                        body: formData                
+                    });
+                    processUploadResponse(response);
+                } catch (error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Upload Failed',
+                        text: 'Network error occurred. Please try again.',
+                        confirmButtonColor: "#545454"
+                    });
+                    $("#upload-btn").prop('disabled', false).text('Generate Q&A');
+                }
+            });
+        });
+
+        // Process the response from the upload endpoint
+        async function processUploadResponse(response) {
+            $("#upload-btn").prop('disabled', false).text('Generate Q&A');
+            
+            switch (response.status) {
+                case 400:  
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Upload Failed',
+                        text: "Sorry, couldn't upload your PDF. Please try again.",
+                        confirmButtonColor: "#545454"
+                    });
+                    break;
+                    
+                case 200:                 
+                    try {
+                        var json = await response.json();
+                        if (json.msg === "error") {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Page Limit Exceeded',
+                                text: 'Maximum number of pages (5) exceeded.',
+                                confirmButtonColor: "#545454"
+                            });
+                        } else {
+                            // Show the result section and PDF
+                            result.style.display = "block";
+                            loader.style.display = "block";
+                            download.style.display = "none";
+                            
+                            // Set the PDF source
+                            viewPdf.setAttribute('src', "../" + json.pdf_filename);
+                            viewPdf.setAttribute('preload', 'auto');
+                            
+                            // Process the PDF for Q&A generation
+                            const formData = new FormData();
+                            formData.append('pdf_filename', json.pdf_filename);
+                            
+                            try {
+                                let analyzeResponse = await fetch('/analyze', {
+                                    method: "POST",
+                                    body: formData                
+                                });
+                                processAnalyzeResponse(analyzeResponse);
+                            } catch (error) {
+                                loader.style.display = "none";
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Analysis Failed',
+                                    text: 'Failed to analyze the PDF. Please try again.',
+                                    confirmButtonColor: "#545454"
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Response Error',
+                            text: 'Invalid response from server. Please try again.',
+                            confirmButtonColor: "#545454"
+                        });
+                    }
+                    break;
+                    
+                default:
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Server Error',
+                        text: `Error ${response.status}. Please contact admin for support.`,
+                        confirmButtonColor: "#545454"
+                    });
+            }
+        }
+
+        // Process the response from the analyze endpoint
+        async function processAnalyzeResponse(response) {            
+            switch (response.status) {
+                case 400:  
+                    loader.style.display = "none";
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Analysis Failed',
+                        text: "Sorry, couldn't analyze your PDF. Please try again.",
+                        confirmButtonColor: "#545454"
+                    });
+                    break;
+                    
+                case 200:
+                    try {
+                        // Hide loader and show download button
+                        loader.style.display = "none";
+                        download.style.display = "block";
+                        
+                        // Get the path to the generated CSV file
+                        var json = await response.json();
+                        downloadBtn.setAttribute('href', "../" + json.output_file);
+                        
+                        // Show success message
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success!',
+                            text: 'Your Q&A has been generated. Click the download button to get your file.',
+                            confirmButtonColor: "#28a745"
+                        });
+                    } catch (error) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Response Error',
+                            text: 'Invalid response from server. Please try again.',
+                            confirmButtonColor: "#545454"
+                        });
+                    }
+                    break;
+                    
+                default:
+                    loader.style.display = "none";
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Server Error',
+                        text: `Error ${response.status}. Please contact admin for support.`,
+                        confirmButtonColor: "#545454"
+                    });
+            }
+        }
+    </script>
+</body>
+</html>
